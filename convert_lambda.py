@@ -15,13 +15,17 @@ from coremltools.proto import NeuralNetwork_pb2
 def swish(x):
     return K.sigmoid(x) * x
 
+def get_shape(input):
+    return input._keras_shape if hasattr(input, '_keras_shape') else input.get_shape()
 
 # Create a silly model that has our custom activation function as a new layer.
 def create_model():
     inp = Input(shape=(256, 256, 3))
     x = Conv2D(6, (3, 3), padding="same")(inp)
     #x = Activation(swish)(x)                   # doesn't work! :-(
+    a, h_i, w_i, b = get_shape(x)
     x = Lambda(swish)(x)
+    x = Reshape([h_i, w_i, b])(x)
     x = GlobalAveragePooling2D()(x)
     x = Dense(10, activation="softmax")(x)
     return Model(inp, x)
@@ -42,16 +46,6 @@ np.random.seed(12345)
 for i in range(len(W)):
     W[i] = np.random.randn(*(W[i].shape)) * 2 - 1
 model.set_weights(W)
-
-
-# Test the model with an image. We'll do the same thing with Core ML in the
-# iOS app and it should give the same output for the same input.
-img = load_img("floortje.png", target_size=(256, 256))
-img = np.expand_dims(img_to_array(img), 0)
-pred = model.predict(img)
-
-print("Predicted output:")
-print(pred)
 
 
 # The conversion function for Lambda layers.
